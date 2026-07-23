@@ -38,7 +38,7 @@ func fetchWithRetry(urlStr string) ([]byte, error) {
 	return nil, err
 }
 
-// ResolveMainBundle fetches the download page and finds the URL of the main JS bundle.
+// ResolveMainBundle fetches the download page and finds all JS bundle URLs.
 func ResolveMainBundle(downloadPage string) (string, error) {
 	htmlBytes, err := fetchWithRetry(downloadPage)
 	if err != nil {
@@ -46,45 +46,69 @@ func ResolveMainBundle(downloadPage string) (string, error) {
 	}
 	htmlStr := string(htmlBytes)
 
-	// Prefer main JS bundle: (?:src|href)=["\']([^"\']*main-[^"\']+\.js)["\']
-	reMain := regexp.MustCompile(`(?:src|href)=["']([^"']*main-[^"']+\.js)["']`)
-	matches := reMain.FindAllStringSubmatch(htmlStr, -1)
-	if len(matches) == 0 {
-		// Fallback to any JS bundle: (?:src|href)=["\']([^"\']+\.js)["\']
-		reAny := regexp.MustCompile(`(?:src|href)=["']([^"']+\.js)["']`)
-		matches = reAny.FindAllStringSubmatch(htmlStr, -1)
-	}
-
-	if len(matches) == 0 {
-		return "", fmt.Errorf("could not find JavaScript bundle on the official Antigravity download page")
-	}
-
-	// Use matches[-1] (the last match)
-	relativeMatch := matches[len(matches)-1][1]
+	// Match all JS scripts and asset files referenced in HTML
+	reAny := regexp.MustCompile(`(?:src|href)=["']([^"']+\.js)["']`)
+	matches := reAny.FindAllStringSubmatch(htmlStr, -1)
 
 	baseURL, err := url.Parse(downloadPage)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse base URL %s: %w", downloadPage, err)
 	}
 
-	refURL, err := url.Parse(relativeMatch)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse relative match %s: %w", relativeMatch, err)
+	var urls []string
+	visited := make(map[string]bool)
+
+	var addURL func(u string)
+	addURL = func(u string) {
+		if visited[u] {
+			return
+		}
+		visited[u] = true
+		urls = append(urls, u)
+
+		// Fetch script to check for imported JS bundles or direct URLs
+		jsBytes, err := fetchWithRetry(u)
+		if err != nil {
+			return
+		}
+		jsStr := string(jsBytes)
+
+		// Find imported JS bundles: import ... from "./..." or import(...)
+		reImport := regexp.MustCompile(`from\s*["']([^"']+\.js)["']|import\(["']([^"']+\.js)["']\)`)
+		impMatches := reImport.FindAllStringSubmatch(jsStr, -1)
+		currBase, err := url.Parse(u)
+		if err != nil {
+			return
+		}
+		for _, im := range impMatches {
+			target := im[1]
+			if target == "" {
+				target = im[2]
+			}
+			refURL, err := url.Parse(target)
+			if err == nil {
+				resolved := currBase.ResolveReference(refURL).String()
+				addURL(resolved)
+			}
+		}
 	}
 
-	return baseURL.ResolveReference(refURL).String(), nil
+	for _, m := range matches {
+		refURL, err := url.Parse(m[1])
+		if err == nil {
+			addURL(baseURL.ResolveReference(refURL).String())
+		}
+	}
+
+	// Include the HTML page itself in case URLs are embedded directly in data attributes or inline scripts
+	urls = append(urls, downloadPage)
+
+	return strings.Join(urls, "|"), nil
 }
 
 // ResolveDownload resolves the version and download URL for a product and platform.
-func ResolveDownload(jsBundleURL, product, platform string) (string, string, error) {
-	jsBytes, err := fetchWithRetry(jsBundleURL)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to fetch JS bundle %s: %w", jsBundleURL, err)
-	}
-
-	jsStr := html.UnescapeString(string(jsBytes))
-	// Normalize escaped slashes sometimes found in JS string literals
-	jsStr = strings.ReplaceAll(jsStr, `\/`, `/`)
+func ResolveDownload(jsBundleURLs, product, platform string) (string, string, error) {
+	urlsToFetch := strings.Split(jsBundleURLs, "|")
 
 	var marker, nextMarker, label string
 	var filenamePatterns []string
@@ -108,29 +132,39 @@ func ResolveDownload(jsBundleURL, product, platform string) (string, string, err
 		return "", "", fmt.Errorf("unknown product: %s", product)
 	}
 
-	var sections []string
-	startIdx := strings.Index(jsStr, marker)
-	if startIdx != -1 {
-		endIdx := strings.Index(jsStr[startIdx:], nextMarker)
-		if endIdx != -1 {
-			sections = append(sections, jsStr[startIdx:startIdx+endIdx])
-		} else {
-			sections = append(sections, jsStr[startIdx:])
+	for _, bundleURL := range urlsToFetch {
+		jsBytes, err := fetchWithRetry(bundleURL)
+		if err != nil {
+			continue
 		}
-	}
-	sections = append(sections, jsStr)
 
-	// Search each section for matches
-	for _, section := range sections {
-		for _, filePat := range filenamePatterns {
-			// pattern: https?://[^"'\s<>)]*/platform/filePat
-			patternStr := fmt.Sprintf(`https?://[^"'\s<>)']*/%s/%s`, regexp.QuoteMeta(platform), filePat)
-			re := regexp.MustCompile(patternStr)
-			matches := re.FindAllString(section, -1)
-			if len(matches) > 0 {
-				urlStr := matches[len(matches)-1]
-				ver := versionFromURL(urlStr)
-				return ver, urlStr, nil
+		jsStr := html.UnescapeString(string(jsBytes))
+		// Normalize escaped slashes sometimes found in JS string literals
+		jsStr = strings.ReplaceAll(jsStr, `\/`, `/`)
+
+		var sections []string
+		startIdx := strings.Index(jsStr, marker)
+		if startIdx != -1 {
+			endIdx := strings.Index(jsStr[startIdx:], nextMarker)
+			if endIdx != -1 {
+				sections = append(sections, jsStr[startIdx:startIdx+endIdx])
+			} else {
+				sections = append(sections, jsStr[startIdx:])
+			}
+		}
+		sections = append(sections, jsStr)
+
+		// Search each section for matches
+		for _, section := range sections {
+			for _, filePat := range filenamePatterns {
+				patternStr := fmt.Sprintf(`https?://[^"'\s<>)']*/%s/%s`, regexp.QuoteMeta(platform), filePat)
+				re := regexp.MustCompile(patternStr)
+				matches := re.FindAllString(section, -1)
+				if len(matches) > 0 {
+					urlStr := matches[len(matches)-1]
+					ver := versionFromURL(urlStr)
+					return ver, urlStr, nil
+				}
 			}
 		}
 	}

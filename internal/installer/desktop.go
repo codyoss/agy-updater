@@ -3,6 +3,7 @@ package installer
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 // DesktopEntryTemplate returns the .desktop file content for Antigravity 2.0.
@@ -55,6 +56,23 @@ func FixChromeSandbox(sandboxPath string) error {
 	}
 
 	return nil
+}
+
+// CleanUserDesktopOverrides removes legacy per-user desktop file overrides if running via sudo.
+func CleanUserDesktopOverrides() {
+	sudoUser := os.Getenv("SUDO_USER")
+	if sudoUser == "" || sudoUser == "root" {
+		return
+	}
+	userHome := filepath.Join("/home", sudoUser)
+	userApps := filepath.Join(userHome, ".local", "share", "applications")
+
+	_ = os.Remove(filepath.Join(userApps, "antigravity.desktop"))
+	_ = os.Remove(filepath.Join(userApps, "antigravity-ide.desktop"))
+
+	if path, err := exec.LookPath("update-desktop-database"); err == nil {
+		_ = exec.Command(path, userApps).Run()
+	}
 }
 
 // RefreshDesktopCaches runs update-desktop-database and gtk-update-icon-cache if they are present on the system.

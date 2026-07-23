@@ -30,9 +30,12 @@ Detects the host OS and architecture.
 
 ### [internal/installer/resolve.go](../internal/installer/resolve.go)
 Handles network requests and text processing to find, fetch, and parse Google's official downloads.
-- Implements `ResolveMainBundle` which fetches `https://antigravity.google/download` and scans it using regular expressions to locate the main JavaScript bundle containing download metadata.
+- Implements `ResolveMainBundle` which fetches `https://antigravity.google/download`, scans the HTML page, and recursively follows linked JavaScript script assets and imports to aggregate all bundle sources containing download metadata.
 - Implements `ResolveDownload` which extracts the tarball URLs and versions for either the `desktop` or `ide` package.
 - Implements `versionFromURL` to extract version strings from official Google URL patterns.
+
+### [internal/installer/bundle_test.go](../internal/installer/bundle_test.go)
+Contains unit tests for verifying `ResolveMainBundle` and `ResolveDownload` URL resolution logic against HTTP test servers.
 
 ### [internal/installer/asar.go](../internal/installer/asar.go)
 Implements a pure Go parser for Electron `.asar` archives.
@@ -44,6 +47,7 @@ Implements a pure Go parser for Electron `.asar` archives.
 Manages desktop integrations, shortcuts, and caching.
 - Contains the `.desktop` file specifications/templates.
 - Implements `RefreshDesktopCaches` which updates the local desktop database and icon caches by executing `update-desktop-database` and `gtk-update-icon-cache` if present.
+- Implements `CleanUserDesktopOverrides` to remove outdated per-user `.desktop` shortcuts in `~/.local/share/applications/` that conflict with system installs.
 - Implements `FixChromeSandbox` to set the owner to `root` and correct permissions (setuid/executable) on the Electron Chrome sandbox executable.
 
 ### [internal/installer/deps.go](../internal/installer/deps.go)

@@ -205,6 +205,7 @@ func InstallDesktopApp(cfg *Config, platInfo *PlatformInfo, jsBundleURL string) 
 		return fmt.Errorf("failed to write desktop entry: %w", err)
 	}
 
+	CleanUserDesktopOverrides()
 	RefreshDesktopCaches()
 	fmt.Printf("Installed Antigravity 2.0 %s at %s/%s\n", ver, root, platInfo.DesktopTop)
 	return nil
@@ -289,6 +290,7 @@ func InstallIDEApp(cfg *Config, platInfo *PlatformInfo, jsBundleURL string) erro
 		return fmt.Errorf("failed to write desktop entry: %w", err)
 	}
 
+	CleanUserDesktopOverrides()
 	RefreshDesktopCaches()
 	fmt.Printf("Installed Antigravity IDE %s at %s/%s\n", ver, root, installDir)
 	return nil
