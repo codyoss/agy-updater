@@ -38,13 +38,18 @@ func fetchWithRetry(urlStr string) ([]byte, error) {
 	return nil, err
 }
 
-// ResolveMainBundle fetches the download page and finds all JS bundle URLs.
+// ResolveMainBundle fetches the download page and finds the URL of the main bundle or page containing download metadata.
 func ResolveMainBundle(downloadPage string) (string, error) {
 	htmlBytes, err := fetchWithRetry(downloadPage)
 	if err != nil {
 		return "", fmt.Errorf("failed to download download page %s: %w", downloadPage, err)
 	}
 	htmlStr := string(htmlBytes)
+
+	// Check if the download page HTML directly contains package download links
+	if strings.Contains(htmlStr, ".tar.gz") {
+		return downloadPage, nil
+	}
 
 	// Match all JS scripts and asset files referenced in HTML
 	reAny := regexp.MustCompile(`(?:src|href)=["']([^"']+\.js)["']`)

@@ -12,10 +12,10 @@ Provides a high-level overview of the tool, its features, building and testing i
 
 ### [cmd/agy-updater/main.go](../cmd/agy-updater/main.go)
 The entry point of the CLI application. Its `main` function delegates execution to a `run` wrapper function that returns errors up to `main` for cleaner error handling and fewer `os.Exit` calls.
-- Dispatches execution flow based on the requested subcommand (`install`/`update`, `status`, or `uninstall`).
-- Parses subcommand-specific arguments. For the `install` subcommand, flags default to installing both desktop and IDE apps unless restricted, and offers `--nautilus-support` and `--apt` opt-in flags.
+- Dispatches execution flow based on the requested subcommand (`install`/`update`, `check`, `status`, or `uninstall`).
+- Parses subcommand-specific arguments. For the `install` and `check` subcommands, flags default to processing both desktop and IDE apps unless restricted, and offers `--nautilus-support` and `--apt` opt-in flags.
 - Resolves the download URLs from Google and checks if installation or updates are actually needed before attempting to elevate privileges.
-- Builds the `installer.Config` configuration struct and executes the appropriate flow (atomic installation/update, offline status checks, or full component uninstallation).
+- Builds the `installer.Config` configuration struct and executes the appropriate flow (atomic installation/update, checking version updates without downloading, offline status checks, or full component uninstallation).
 
 ### [internal/installer/config.go](../internal/installer/config.go)
 Declares project constants (URLs, directory paths, and symlink targets) and the configuration structures for the app.
@@ -30,12 +30,17 @@ Detects the host OS and architecture.
 
 ### [internal/installer/resolve.go](../internal/installer/resolve.go)
 Handles network requests and text processing to find, fetch, and parse Google's official downloads.
-- Implements `ResolveMainBundle` which fetches `https://antigravity.google/download`, scans the HTML page, and recursively follows linked JavaScript script assets and imports to aggregate all bundle sources containing download metadata.
+- Implements `ResolveMainBundle` which fetches `https://antigravity.google/download`, checks for direct package links, or scans the HTML page and recursively follows linked JavaScript script assets and imports to aggregate all bundle sources containing download metadata.
 - Implements `ResolveDownload` which extracts the tarball URLs and versions for either the `desktop` or `ide` package.
 - Implements `versionFromURL` to extract version strings from official Google URL patterns.
 
 ### [internal/installer/bundle_test.go](../internal/installer/bundle_test.go)
 Contains unit tests for verifying `ResolveMainBundle` and `ResolveDownload` URL resolution logic against HTTP test servers.
+
+### [internal/installer/check.go](../internal/installer/check.go)
+Implements version checking without downloading tarballs.
+- Implements `CheckVersions` and `CheckVersionsWithURL` to compare locally installed application versions against resolved Google download package versions.
+- Formats status messages indicating whether installed components are up to date or have newer versions available for download.
 
 ### [internal/installer/asar.go](../internal/installer/asar.go)
 Implements a pure Go parser for Electron `.asar` archives.
@@ -73,3 +78,4 @@ Reads installed component details to print status info offline (with fallback su
 
 ### [internal/installer/uninstall.go](../internal/installer/uninstall.go)
 Performs cleanup by removing `/opt` directories, symlinks, desktop shortcuts, icons, and shell helper scripts.
+

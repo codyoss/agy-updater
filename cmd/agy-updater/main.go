@@ -26,12 +26,13 @@ Usage:
 
 Subcommands:
   install, update       Install or update Antigravity 2.0 desktop app and Antigravity IDE
+  check                 Check for newer versions without downloading
   status                Show installed helper-managed apps and versions
   uninstall             Remove helper-managed Antigravity desktop/IDE files
 
-Options for 'install' / 'update':
-  --desktop              Install/update Antigravity 2.0 desktop app only
-  --ide                  Install/update Antigravity IDE only
+Options for 'install' / 'update' / 'check':
+  --desktop              Install/update/check Antigravity 2.0 desktop app only
+  --ide                  Install/update/check Antigravity IDE only
   --cli                  Also run Google's official Antigravity CLI installer
   --nautilus-support     Enable GNOME Files/Nautilus context-menu helper
   --apt                  Install apt dependencies automatically
@@ -61,7 +62,7 @@ func run() error {
 		return nil
 	}
 
-	if subcommand != "install" && subcommand != "update" && subcommand != "status" && subcommand != "uninstall" {
+	if subcommand != "install" && subcommand != "update" && subcommand != "status" && subcommand != "uninstall" && subcommand != "check" {
 		usage()
 		return fmt.Errorf("unknown subcommand %q", subcommand)
 	}
@@ -135,6 +136,10 @@ func run() error {
 			return err
 		}
 		return nil
+	}
+
+	if subcommand == "check" {
+		return installer.CheckVersions(os.Stdout, cfg)
 	}
 
 	// Default flow: Install or Update

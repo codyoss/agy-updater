@@ -64,3 +64,25 @@ func TestResolveDownload(t *testing.T) {
 		t.Errorf("expected URL, got %q", urlStr)
 	}
 }
+
+func TestLiveDownloadPage(t *testing.T) {
+	jsURL, err := ResolveMainBundle(DownloadPage)
+	if err != nil {
+		t.Fatalf("ResolveMainBundle failed: %v", err)
+	}
+	t.Logf("Resolved download bundle URL: %s", jsURL)
+
+	verDesktop, urlDesktop, errDesktop := ResolveDownload(jsURL, "desktop", "linux-x64")
+	if errDesktop != nil {
+		t.Fatalf("ResolveDownload desktop failed: %v", errDesktop)
+	}
+	t.Logf("Desktop linux-x64: version=%s, url=%s", verDesktop, urlDesktop)
+
+	verIDE, urlIDE, errIDE := ResolveDownload(jsURL, "ide", "linux-x64")
+	if errIDE != nil {
+		t.Fatalf("ResolveDownload ide failed: %v", errIDE)
+	}
+	t.Logf("IDE linux-x64: version=%s, url=%s", verIDE, urlIDE)
+}
+
+

@@ -36,16 +36,17 @@ Usage:
 
 Subcommands:
   install, update       Install or update Antigravity 2.0 desktop app and Antigravity IDE
+  check                 Check for newer versions without downloading
   status                Show installed helper-managed apps and versions
   uninstall             Remove helper-managed Antigravity desktop/IDE files
 ```
 
-### Install / Update Options
+### Install / Update / Check Options
 
 | Flag | Description |
 |---|---|
-| `--desktop` | Install/update Antigravity 2.0 desktop app only |
-| `--ide` | Install/update Antigravity IDE only |
+| `--desktop` | Install/update/check Antigravity 2.0 desktop app only |
+| `--ide` | Install/update/check Antigravity IDE only |
 | `--cli` | Also execute Google's official Antigravity CLI installer |
 | `--nautilus-support` | Enable GNOME Files/Nautilus context-menu helper |
 | `--apt` | Install apt dependencies automatically (e.g. `ca-certificates`, `desktop-file-utils`) |
@@ -66,17 +67,22 @@ agy-updater install
 agy-updater update --ide
 ```
 
-**3. Install with GNOME Files / Nautilus context menus and install required system dependencies automatically:**
+**3. Check for available updates without downloading:**
+```bash
+agy-updater check
+```
+
+**4. Install with GNOME Files / Nautilus context menus and install required system dependencies automatically:**
 ```bash
 agy-updater install --nautilus-support --apt -y
 ```
 
-**4. Check current status & installed versions:**
+**5. Check current status & installed versions:**
 ```bash
 agy-updater status
 ```
 
-**5. Uninstall all components and helpers:**
+**6. Uninstall all components and helpers:**
 ```bash
 agy-updater uninstall
 ```
